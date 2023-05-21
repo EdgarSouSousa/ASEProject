@@ -1,155 +1,156 @@
-#include <string.h>
+/*
+ * SPDX-FileCopyrightText: 2022 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 #include <stdio.h>
-#include "sdkconfig.h"
-#include "esp_log.h"
+#include <stdlib.h>
+#include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "freertos/semphr.h"
-#include "esp_adc/adc_continuous.h"
+#include "soc/soc_caps.h"
+#include "esp_log.h"
+#include "esp_adc/adc_oneshot.h"
+#include "esp_adc/adc_cali.h"
+#include "esp_adc/adc_cali_scheme.h"
 
-#define EXAMPLE_READ_LEN   256
-#define GET_UNIT(x)        ((x>>3) & 0x1)
+const static char *TAG = "EXAMPLE";
 
+/*---------------------------------------------------------------
+        ADC General Macros
+---------------------------------------------------------------*/
+
+//ADC1 Channels
 #if CONFIG_IDF_TARGET_ESP32
-#define ADC_CONV_MODE       ADC_CONV_SINGLE_UNIT_1  //ESP32 only supports ADC1 DMA mode
-#define ADC_OUTPUT_TYPE     ADC_DIGI_OUTPUT_FORMAT_TYPE1
+#define EXAMPLE_ADC1_CHAN0          ADC_CHANNEL_4
+#define EXAMPLE_ADC1_CHAN1          ADC_CHANNEL_5
+#else
+#define EXAMPLE_ADC1_CHAN0          ADC_CHANNEL_2
+#define EXAMPLE_ADC1_CHAN1          ADC_CHANNEL_3
 #endif
 
-#if CONFIG_IDF_TARGET_ESP32
-static adc_channel_t channel[2] = {ADC_CHANNEL_7, ADC_CHANNEL_6};
+#if (SOC_ADC_PERIPH_NUM >= 2) && !CONFIG_IDF_TARGET_ESP32C3
+/**
+ * On ESP32C3, ADC2 is no longer supported, due to its HW limitation.
+ * Search for errata on espressif website for more details.
+ */
+#define EXAMPLE_USE_ADC2            1
 #endif
 
-static TaskHandle_t s_task_handle[2];
-static const char *TAG = "EXAMPLE";
+#define EXAMPLE_ADC_ATTEN           ADC_ATTEN_DB_11
 
-static void s_conv_done_cb(void *arg)
-{
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    vTaskNotifyGiveFromISR(s_task_handle[GET_UNIT((uint32_t)arg)], &xHigherPriorityTaskWoken);
-    portYIELD_FROM_ISR();
-}
+static int adc_raw[2][10];
+static int voltage[2][10];
+static bool example_adc_calibration_init(adc_unit_t unit, adc_atten_t atten, adc_cali_handle_t *out_handle);
+static void example_adc_calibration_deinit(adc_cali_handle_t handle);
 
-static void continuous_adc_init(adc_channel_t *channel, uint8_t channel_num, adc_continuous_handle_t *out_handle)
-{
-    adc_continuous_handle_t handle = NULL;
-
-    adc_continuous_handle_cfg_t adc_config = {
-        .max_store_buf_size = 1024,
-        .conv_frame_size = EXAMPLE_READ_LEN,
-    };
-    ESP_ERROR_CHECK(adc_continuous_new_handle(&adc_config, &handle));
-
-    adc_continuous_config_t dig_cfg = {
-        .sample_freq_hz = 20 * 1000,
-        .conv_mode = ADC_CONV_MODE,
-        .format = ADC_OUTPUT_TYPE,
-    };
-
-    adc_digi_pattern_config_t adc_pattern[SOC_ADC_PATT_LEN_MAX] = {0};
-    dig_cfg.pattern_num = channel_num;
-    for (int i = 0; i < channel_num; i++) {
-        uint8_t unit = GET_UNIT(channel[i]);
-        uint8_t ch = channel[i] & 0x7;
-        adc_pattern[i].atten = ADC_ATTEN_DB_0;
-        adc_pattern[i].channel = ch;
-        adc_pattern[i].unit = unit;
-        adc_pattern[i].bit_width = SOC_ADC_DIGI_MAX_BITWIDTH;
-
-        ESP_LOGI(TAG, "adc_pattern[%d].atten is :%x", i, adc_pattern[i].atten);
-        ESP_LOGI(TAG, "adc_pattern[%d].channel is :%x", i, adc_pattern[i].channel);
-        ESP_LOGI(TAG, "adc_pattern[%d].unit is :%x", i, adc_pattern[i].unit);
-    }
-    dig_cfg.adc_pattern = adc_pattern;
-    ESP_ERROR_CHECK(adc_continuous_config(handle, &dig_cfg));
-
-    *out_handle = handle;
-}
-
-void adc_task1(void *pvParameters)
-{
-    esp_err_t ret;
-    adc_continuous_handle_t handle = (adc_continuous_handle_t)pvParameters;
-    uint32_t ret_num = 0;
-    uint8_t result[EXAMPLE_READ_LEN] = {0};
-
-    while (1)
-    {
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-
-        while (1)
-        {
-            vTaskDelay(10 / portTICK_PERIOD_MS);
-            ret = adc_continuous_read(handle, result, EXAMPLE_READ_LEN, &ret_num, 0);
-            if (ret == ESP_OK)
-            {
-                printf("ADC_TASK1 - ADC_CHANNEL_7 values:\n");
-                    for (uint32_t i = 0; i < ret_num; i++)
-                    {
-                        printf("%d ", result[i]);
-                    }
-                    printf("\n");
-            }
-            else if (ret == ESP_ERR_TIMEOUT)
-            {
-                break;
-            }
-        }
-    }
-}
-
-void adc_task2(void *pvParameters)
-{
-    esp_err_t ret;
-    adc_continuous_handle_t handle = (adc_continuous_handle_t)pvParameters;
-    uint32_t ret_num = 0;
-    uint8_t result[EXAMPLE_READ_LEN] = {0};
-
-    while (1)
-    {
-        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-
-        while (1)
-        {
-            vTaskDelay(10 / portTICK_PERIOD_MS);
-            ret = adc_continuous_read(handle, result, EXAMPLE_READ_LEN, &ret_num, 0);
-            if (ret == ESP_OK)
-            {
-                // Process data from ADC_CHANNEL_7
-                printf("ADC_TASK2 - ADC_CHANNEL_6 values:\n");
-                for (uint32_t i = 0; i < ret_num; i++)
-                {
-                    printf("%d ", result[i]);
-                }
-                printf("\n");
-            }
-            else if (ret == ESP_ERR_TIMEOUT)
-            {
-                break;
-            }
-        }
-    }
-}
 
 void app_main(void)
 {
-    esp_err_t ret;
-    uint32_t ret_num = 0;
-    uint8_t result[EXAMPLE_READ_LEN] = {0};
-    memset(result, 0xcc, EXAMPLE_READ_LEN);
-
-    adc_continuous_handle_t handle = NULL;
-    continuous_adc_init(channel, sizeof(channel) / sizeof(adc_channel_t), &handle);
-
-    adc_continuous_evt_cbs_t cbs = {
-        .on_conv_done = s_conv_done_cb,
+    //-------------ADC1 Init---------------//
+    adc_oneshot_unit_handle_t adc1_handle;
+    adc_oneshot_unit_init_cfg_t init_config1 = {
+        .unit_id = ADC_UNIT_1,
     };
-    ESP_ERROR_CHECK(adc_continuous_register_event_callbacks(handle, &cbs, NULL));
-    ESP_ERROR_CHECK(adc_continuous_start(handle));
+    ESP_ERROR_CHECK(adc_oneshot_new_unit(&init_config1, &adc1_handle));
 
-    // Create ADC tasks
-    xTaskCreate(adc_task1, "ADC Task 1", 2048, (void *)handle, 5, &s_task_handle[0]);
-    xTaskCreate(adc_task2, "ADC Task 2", 2048, (void *)handle, 5, &s_task_handle[1]);
+    //-------------ADC1 Config---------------//
+    adc_oneshot_chan_cfg_t config = {
+        .bitwidth = ADC_BITWIDTH_DEFAULT,
+        .atten = EXAMPLE_ADC_ATTEN,
+    };
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, EXAMPLE_ADC1_CHAN0, &config));
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, EXAMPLE_ADC1_CHAN1, &config));
+
+    //-------------ADC1 Calibration Init---------------//
+    adc_cali_handle_t adc1_cali_handle = NULL;
+    bool do_calibration1 = example_adc_calibration_init(ADC_UNIT_1, EXAMPLE_ADC_ATTEN, &adc1_cali_handle);
+
+     while (1) {
+        ESP_ERROR_CHECK(adc_oneshot_read(adc1_handle, EXAMPLE_ADC1_CHAN0, &adc_raw[0][0]));
+        ESP_LOGI(TAG, "ADC%d Channel[%d] Raw Data: %d", ADC_UNIT_1 + 1, EXAMPLE_ADC1_CHAN0, adc_raw[0][0]);
+        if (do_calibration1) {
+            ESP_ERROR_CHECK(adc_cali_raw_to_voltage(adc1_cali_handle, adc_raw[0][0], &voltage[0][0]));
+            ESP_LOGI(TAG, "ADC%d Channel[%d] Cali Voltage: %d mV", ADC_UNIT_1 + 1, EXAMPLE_ADC1_CHAN0, voltage[0][0]);
+        }
+
+        ESP_ERROR_CHECK(adc_oneshot_read(adc1_handle, EXAMPLE_ADC1_CHAN1, &adc_raw[0][1]));
+        ESP_LOGI(TAG, "ADC%d Channel[%d] Raw Data: %d", ADC_UNIT_1 + 1, EXAMPLE_ADC1_CHAN1, adc_raw[0][1]);
+        if (do_calibration1) {
+            ESP_ERROR_CHECK(adc_cali_raw_to_voltage(adc1_cali_handle, adc_raw[0][1], &voltage[0][1]));
+            ESP_LOGI(TAG, "ADC%d Channel[%d] Cali Voltage: %d mV", ADC_UNIT_1 + 1, EXAMPLE_ADC1_CHAN1, voltage[0][1]);
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+
+    //Tear Down
+    ESP_ERROR_CHECK(adc_oneshot_del_unit(adc1_handle));
+    if (do_calibration1) {
+        example_adc_calibration_deinit(adc1_cali_handle);
+    }
+}
 
 
+/*---------------------------------------------------------------
+        ADC Calibration
+---------------------------------------------------------------*/
+static bool example_adc_calibration_init(adc_unit_t unit, adc_atten_t atten, adc_cali_handle_t *out_handle)
+{
+    adc_cali_handle_t handle = NULL;
+    esp_err_t ret = ESP_FAIL;
+    bool calibrated = false;
 
+#if ADC_CALI_SCHEME_CURVE_FITTING_SUPPORTED
+    if (!calibrated) {
+        ESP_LOGI(TAG, "calibration scheme version is %s", "Curve Fitting");
+        adc_cali_curve_fitting_config_t cali_config = {
+            .unit_id = unit,
+            .atten = atten,
+            .bitwidth = ADC_BITWIDTH_DEFAULT,
+        };
+        ret = adc_cali_create_scheme_curve_fitting(&cali_config, &handle);
+        if (ret == ESP_OK) {
+            calibrated = true;
+        }
+    }
+#endif
+
+#if ADC_CALI_SCHEME_LINE_FITTING_SUPPORTED
+    if (!calibrated) {
+        ESP_LOGI(TAG, "calibration scheme version is %s", "Line Fitting");
+        adc_cali_line_fitting_config_t cali_config = {
+            .unit_id = unit,
+            .atten = atten,
+            .bitwidth = ADC_BITWIDTH_DEFAULT,
+        };
+        ret = adc_cali_create_scheme_line_fitting(&cali_config, &handle);
+        if (ret == ESP_OK) {
+            calibrated = true;
+        }
+    }
+#endif
+
+    *out_handle = handle;
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "Calibration Success");
+    } else if (ret == ESP_ERR_NOT_SUPPORTED || !calibrated) {
+        ESP_LOGW(TAG, "eFuse not burnt, skip software calibration");
+    } else {
+        ESP_LOGE(TAG, "Invalid arg or no memory");
+    }
+
+    return calibrated;
+}
+
+static void example_adc_calibration_deinit(adc_cali_handle_t handle)
+{
+#if ADC_CALI_SCHEME_CURVE_FITTING_SUPPORTED
+    ESP_LOGI(TAG, "deregister %s calibration scheme", "Curve Fitting");
+    ESP_ERROR_CHECK(adc_cali_delete_scheme_curve_fitting(handle));
+
+#elif ADC_CALI_SCHEME_LINE_FITTING_SUPPORTED
+    ESP_LOGI(TAG, "deregister %s calibration scheme", "Line Fitting");
+    ESP_ERROR_CHECK(adc_cali_delete_scheme_line_fitting(handle));
+#endif
 }
