@@ -1,0 +1,7 @@
+To run simply do 
+
+python3 -m http.server 8000
+python3 webServer.py
+
+double check if the esp and host laptop are in the same network
+check esp SSID and password for acess to the network

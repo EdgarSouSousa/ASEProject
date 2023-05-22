@@ -1,8 +1,10 @@
 import http.server
 import socketserver
 from urllib.parse import parse_qs
+import json
 
-PORT = 8000
+
+PORT = 5000
 
 class CustomRequestHandler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
@@ -14,6 +16,10 @@ class CustomRequestHandler(http.server.SimpleHTTPRequestHandler):
         value2 = int(data.get('value2', [0])[0])
 
         print(f"Received data: value1 = {value1}, value2 = {value2}")
+
+        #write value1 and value2 to jsonfile named data.json
+        with open('data.json', 'w') as outfile:
+            json.dump(data, outfile)
 
         self.send_response(200)
         self.send_header('Content-type', 'text/html')

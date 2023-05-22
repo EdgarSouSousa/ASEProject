@@ -69,7 +69,7 @@ void print_ip_info(esp_netif_t *netif) {
 void send_http_request(int adc_value1, int adc_value2)
 {
     esp_http_client_config_t config = {
-        .url = "REPLACE:8000",
+        .url = "http://192.168.12.222:5000",
         .method = HTTP_METHOD_POST,
     };
     esp_http_client_handle_t client = esp_http_client_init(&config);
@@ -131,9 +131,6 @@ void wifi_init_sta(void)
     sta_netif = esp_netif_create_default_wifi_sta();
     assert(sta_netif);
 
-    //Boas diana isto está configurado para o HotSpot do Meu Tele
-    //Se quiseres mudar para o teu HotSpot tens de mudar o ssid e a password
-    //e ali em cima tens de mudar para o IP do teu PC
     wifi_config_t wifi_config = {
         .sta = {
             .ssid = "Arduino",
