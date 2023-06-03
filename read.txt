@@ -5,3 +5,7 @@ python3 webServer.py
 
 double check if the esp and host laptop are in the same network
 check esp SSID and password for acess to the network
+
+
+sudo chmod 0777 /dev/ttyUSB0
+. $HOME/esp/esp-idf/export.sh

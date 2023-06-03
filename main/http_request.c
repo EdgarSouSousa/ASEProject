@@ -3,7 +3,7 @@
 #include "esp_log.h"
 #define TAG "final-project"
 
-void send_http_request(int adc_value1, int adc_value2)
+void send_http_request(int adc_value1, int adc_value2, float temperature, float humidity)
 {
     esp_http_client_config_t config = {
         .url = "http://192.168.12.222:5000",
@@ -12,7 +12,7 @@ void send_http_request(int adc_value1, int adc_value2)
     esp_http_client_handle_t client = esp_http_client_init(&config);
 
     char post_data[64];
-    snprintf(post_data, sizeof(post_data), "value1=%d&value2=%d", adc_value1, adc_value2);
+    snprintf(post_data, sizeof(post_data), "value1=%d&value2=%d&temperature=%.1f&humidity=%.1f", adc_value1, adc_value2, temperature, humidity);
 
     esp_http_client_set_header(client, "Content-Type", "application/x-www-form-urlencoded");
     esp_http_client_set_post_field(client, post_data, strlen(post_data));
