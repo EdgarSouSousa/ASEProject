@@ -18,6 +18,7 @@
 #include "adc.h"
 #include "dht11.h"
 #include "http_request.h"
+#include "esp_sleep.h"
 
 #define TAG "final-project"
 
@@ -42,7 +43,7 @@ void dht11_task(void *pvParameters)
         }
 
         xSemaphoreGive(xSemaphore); // Release the semaphore
-        vTaskDelay(pdMS_TO_TICKS(3000)); // Wait for 5 seconds before reading again
+        vTaskDelay(pdMS_TO_TICKS(10000)); // Wait for 5 seconds before reading again
     }
 }
 
@@ -84,7 +85,7 @@ void adc_task(void *pvParameters)
         }
 
         xSemaphoreGive(xSemaphore); // Release the semaphore
-        vTaskDelay(pdMS_TO_TICKS(3000)); // Wait for 1 second before reading again
+        vTaskDelay(pdMS_TO_TICKS(10000)); // Wait for 1 second before reading again
     }
 }
 
@@ -109,7 +110,9 @@ void http_request_task(void *pvParameters)
         // Give the semaphore back to allow the tasks to continue
         xSemaphoreGive(xSemaphore);
 
-        vTaskDelay(pdMS_TO_TICKS(3000)); // Wait for 5 seconds before sending again
+        esp_sleep_enable_timer_wakeup(9000000);
+
+        vTaskDelay(pdMS_TO_TICKS(10000)); // Wait for 5 seconds before sending again
     }
 }
 
