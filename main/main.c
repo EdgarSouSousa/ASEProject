@@ -26,11 +26,12 @@ float temperature, humidity;
 
 void dht11_task(void *pvParameters)
 {
-    uint8_t dht11_data[5] = {0}; // Initialize the DHT11 data array
+    
 
     while (1) {
-        // Read the DHT11 data
-        dht11_read(dht11_data);
+        // Read the DHT11 data returned by the sensor
+        uint8_t* dht11_data = dht11_read();
+        
         uint8_t checksum = dht11_data[0] + dht11_data[1] + dht11_data[2] + dht11_data[3];
         if (checksum == dht11_data[4]) {
             temperature = dht11_data[2] + (dht11_data[3] / 10.0);
@@ -41,7 +42,7 @@ void dht11_task(void *pvParameters)
         }
 
         xSemaphoreGive(xSemaphore); // Release the semaphore
-        vTaskDelay(pdMS_TO_TICKS(1000)); // Wait for 5 seconds before reading again
+        vTaskDelay(pdMS_TO_TICKS(3000)); // Wait for 5 seconds before reading again
     }
 }
 
@@ -83,7 +84,7 @@ void adc_task(void *pvParameters)
         }
 
         xSemaphoreGive(xSemaphore); // Release the semaphore
-        vTaskDelay(pdMS_TO_TICKS(5000)); // Wait for 1 second before reading again
+        vTaskDelay(pdMS_TO_TICKS(3000)); // Wait for 1 second before reading again
     }
 }
 
@@ -91,7 +92,6 @@ void adc_task(void *pvParameters)
 void http_request_task(void *pvParameters)
 {
     while (1) {
-        vTaskDelay(pdMS_TO_TICKS(3000));
 
         xSemaphoreTake(xSemaphore, portMAX_DELAY);
 
@@ -129,7 +129,6 @@ void app_main(void)
 
     // Initialize the Wi-Fi connection
     wifi_init_sta();
-    
 
     // Create the semaphore
     xSemaphore = xSemaphoreCreateBinary();

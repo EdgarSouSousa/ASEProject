@@ -1,9 +1,8 @@
-#ifndef _DHT11_H_
-#define _DHT11_H_
+#ifndef DHT11_H
+#define DHT11_H
+#include "driver/gpio.h"
 
 #include <stdint.h>
 
-void delay_us(uint32_t us);
-void dht11_read(uint8_t *data);
-
-#endif /* _DHT11_H_ */
+uint8_t* dht11_read();
+#endif
