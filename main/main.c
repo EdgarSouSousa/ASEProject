@@ -19,8 +19,15 @@
 #include "dht11.h"
 #include "http_request.h"
 #include "esp_sleep.h"
+#include "1602A.h"
 
 #define TAG "final-project"
+
+#define I2C_PORT I2C_NUM_0
+#define SDA_PIN 21
+#define SCL_PIN 22
+#define CLK_SPEED_HZ 100000
+#define DISPLAY_ADDR 0x27
 
 SemaphoreHandle_t xSemaphore;
 float temperature, humidity;
@@ -104,15 +111,27 @@ void http_request_task(void *pvParameters)
             err = esp_wifi_sta_get_ap_info(&ap_info);
         }
 
+        //normalise the voltage
+        voltage[0][0] = (voltage[0][0]- 142) * 100 / 4095;
+        voltage[0][1] = (voltage[0][1]-142) * 100 / 4095;
+
+
         // Send the data via HTTP request
         send_http_request(voltage[0][0], voltage[0][1], temperature, humidity);
+
+        // convert volage[0][0] to a string to be displayed on the LCD
+        char voltage1[20]; 
+        sprintf(voltage1, "%d", voltage[0][0]);
+        strcat(voltage1, " Humidity ");
+        _1602A_display_string(voltage1);
+
 
         // Give the semaphore back to allow the tasks to continue
         xSemaphoreGive(xSemaphore);
 
         esp_sleep_enable_timer_wakeup(9000000);
 
-        vTaskDelay(pdMS_TO_TICKS(10000)); // Wait for 5 seconds before sending again
+        vTaskDelay(pdMS_TO_TICKS(10000)); // Wait for 10 seconds before sending again
     }
 }
 
@@ -125,6 +144,10 @@ void app_main(void)
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
+
+    i2c_init(I2C_PORT, SDA_PIN, SCL_PIN, CLK_SPEED_HZ);
+    _1602A_init(I2C_PORT, DISPLAY_ADDR, "final", 1000);
+
 
     // Initialize the default event loop
     ESP_ERROR_CHECK(esp_netif_init());
