@@ -105,12 +105,12 @@ esp_err_t _1602A_init(i2c_port_t i2c_port, uint8_t sens_addr, char *data, TickTy
 
     // Configure the display
     uint8_t config_commands[] = {
-        0x33, // Initialize
-        0x32, // Set 4-bit mode
-        0x28, // 2-line, 5x8 matrix
-        0x0C, // Display on, cursor off, blink off
-        0x06, // Increment cursor
-        0x01, // Clear screen
+        0x33, 
+        0x32, 
+        0x28, 
+        0x0C, 
+        0x06, 
+        0x01, 
     };
 
     // Send configuration commands
