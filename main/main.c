@@ -101,6 +101,18 @@ void http_request_task(void *pvParameters)
 {
     while (1) {
 
+         //normalise the voltage
+        voltage[0][0] = (voltage[0][0]- 142) * 100 / 4095;
+        voltage[0][1] = (voltage[0][1]-142) * 100 / 4095;
+
+
+          // convert volage[0][0] to a string to be displayed on the LCD
+        char voltage1[20]; 
+        sprintf(voltage1, "%d", voltage[0][0]);
+        strcat(voltage1, " Humidity ");
+        _1602A_display_string(voltage1);
+
+
         xSemaphoreTake(xSemaphore, portMAX_DELAY);
 
         // Wait for the Wi-Fi module to be connected
@@ -111,19 +123,12 @@ void http_request_task(void *pvParameters)
             err = esp_wifi_sta_get_ap_info(&ap_info);
         }
 
-        //normalise the voltage
-        voltage[0][0] = (voltage[0][0]- 142) * 100 / 4095;
-        voltage[0][1] = (voltage[0][1]-142) * 100 / 4095;
-
+       
 
         // Send the data via HTTP request
         send_http_request(voltage[0][0], voltage[0][1], temperature, humidity);
 
-        // convert volage[0][0] to a string to be displayed on the LCD
-        char voltage1[20]; 
-        sprintf(voltage1, "%d", voltage[0][0]);
-        strcat(voltage1, " Humidity ");
-        _1602A_display_string(voltage1);
+      
 
         // Give the semaphore back to allow the tasks to continue
         xSemaphoreGive(xSemaphore);
