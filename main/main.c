@@ -125,7 +125,6 @@ void http_request_task(void *pvParameters)
         strcat(voltage1, " Humidity ");
         _1602A_display_string(voltage1);
 
-
         // Give the semaphore back to allow the tasks to continue
         xSemaphoreGive(xSemaphore);
 

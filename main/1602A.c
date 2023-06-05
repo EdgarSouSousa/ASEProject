@@ -35,11 +35,16 @@ esp_err_t _1602A_send_command(i2c_port_t i2c_port, uint8_t command) {
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
     i2c_master_start(cmd);
     i2c_master_write_byte(cmd, (DISPLAY_ADDR << 1) | I2C_MASTER_WRITE, true);
+    vTaskDelay(1 / portTICK_PERIOD_MS); // Add this delay
     i2c_master_write_byte(cmd, high_nibble | 0x0C, true);
+    vTaskDelay(1 / portTICK_PERIOD_MS); // Add this delay
     i2c_master_write_byte(cmd, high_nibble | 0x80, true); // Send enable pulse (EN=1)
+    vTaskDelay(1 / portTICK_PERIOD_MS); // Add this delay
     
     i2c_master_write_byte(cmd, low_nibble | 0x0C,true);
+    vTaskDelay(1 / portTICK_PERIOD_MS); // Add this delay
     i2c_master_write_byte(cmd, low_nibble | 0x80, true); // Send enable pulse (EN=1)
+    vTaskDelay(1 / portTICK_PERIOD_MS); // Add this delay
     
     i2c_master_stop(cmd);
     err = i2c_master_cmd_begin(i2c_port, cmd, 1000 / portTICK_PERIOD_MS);
@@ -57,13 +62,18 @@ esp_err_t _1602A_send_data(i2c_port_t i2c_port, uint8_t command) {
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
     i2c_master_start(cmd);
     i2c_master_write_byte(cmd, (DISPLAY_ADDR << 1) | I2C_MASTER_WRITE, true);
+    vTaskDelay(1 / portTICK_PERIOD_MS); // Add this delay
     i2c_master_write_byte(cmd, high_nibble | 0x09, true);
+    vTaskDelay(1 / portTICK_PERIOD_MS); // Add this delay
     i2c_master_write_byte(cmd, high_nibble | 0x0D, true); // Send enable pulse (EN=1)
+    vTaskDelay(1 / portTICK_PERIOD_MS); // Add this delay
 
     
     
     i2c_master_write_byte(cmd, low_nibble | 0x09,true);
+    vTaskDelay(1 / portTICK_PERIOD_MS); // Add this delay
     i2c_master_write_byte(cmd, low_nibble | 0x0D, true); // Send enable pulse (EN=1)
+    vTaskDelay(1 / portTICK_PERIOD_MS); // Add this delay
     
     i2c_master_stop(cmd);
     err = i2c_master_cmd_begin(i2c_port, cmd, 1000 / portTICK_PERIOD_MS);
@@ -90,33 +100,34 @@ void _1602A_display_string(const char *str) {
 esp_err_t _1602A_init(i2c_port_t i2c_port, uint8_t sens_addr, char *data, TickType_t time_out) {
     esp_err_t err;
 
-   
+    // Wait for the display to power up
+    vTaskDelay(50 / portTICK_PERIOD_MS);
+
     // Configure the display
     uint8_t config_commands[] = {
-        0x30, // 2-line, 5x8 matrix
-        0x30, // Turn cursor off
-        0x30,
-        0x20, // Shift cursor right
-        0x28,  // Clear screen
-		0x08,
-        0x01, // Display on, cursor off, blink off
+        0x33, // Initialize
+        0x32, // Set 4-bit mode
+        0x28, // 2-line, 5x8 matrix
+        0x0C, // Display on, cursor off, blink off
         0x06, // Increment cursor
-        0x0C, // Turn on display
-
+        0x01, // Clear screen
     };
 
     // Send configuration commands
     for (int i = 0; i < sizeof(config_commands); i++) {
         err = _1602A_send_command(i2c_port, config_commands[i]);
-        //wait 100 ms 
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-		
+
         if (err != ESP_OK) {
             return err;
         }
+
+        // Wait for the command to be processed
+        if (config_commands[i] == 0x01) {
+            vTaskDelay(2 / portTICK_PERIOD_MS); // Clear screen takes longer
+        } else {
+            vTaskDelay(50 / portTICK_PERIOD_MS);
+        }
     }
 
-    //wait 100 ms
-    vTaskDelay(100 / portTICK_PERIOD_MS);
     return ESP_OK;
 }
