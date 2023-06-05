@@ -3,7 +3,6 @@ import socketserver
 from urllib.parse import parse_qs
 import json
 
-
 PORT = 5000
 
 class CustomRequestHandler(http.server.SimpleHTTPRequestHandler):
@@ -12,13 +11,9 @@ class CustomRequestHandler(http.server.SimpleHTTPRequestHandler):
         post_data = self.rfile.read(content_length)
         data = parse_qs(post_data.decode('utf-8'))
 
-        value1 = int(data.get('value1', [0])[0])
-        value2 = int(data.get('value2', [0])[0])
-        value3 = float(data.get('temperature', ['0'])[0])
-        value4 = float(data.get('humidity', ['0'])[0])
-        print(f"Received data: value1 = {value1}, value2 = {value2} value3 = {value3} value4 = {value4}")
+        print(f"Received data: {data}")
 
-        #write value1 and value2 to jsonfile named data.json
+        # Write the data dictionary to a JSON file named data.json
         with open('data.json', 'w') as outfile:
             json.dump(data, outfile)
 
@@ -32,3 +27,4 @@ httpd = socketserver.TCPServer(("", PORT), Handler)
 print(f"Serving on port {PORT}")
 
 httpd.serve_forever()
+
