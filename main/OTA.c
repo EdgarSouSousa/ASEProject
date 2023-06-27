@@ -78,7 +78,7 @@ static void performOTAUpdate(esp_http_client_handle_t client, esp_http_client_co
 void checkForUpdates(void)
 {
     // URL of the firmware binary hosted on your HTTP server
-    const char *firmwareUrl = "http://example.com/firmware.bin";
+    const char *firmwareUrl = "https://github.com/EdgarSouSousa/ASEProject/blob/main/build/final-project.bin";
 
     esp_http_client_config_t config = {
         .url = firmwareUrl,
