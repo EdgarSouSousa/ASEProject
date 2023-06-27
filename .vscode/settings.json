@@ -1,5 +1,6 @@
 {
     "files.associations": {
-        "dht11.h": "c"
+        "dht11.h": "c",
+        "wifi_init.h": "c"
     }
 }

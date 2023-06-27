@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "esp_http_client.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "soc/soc_caps.h"
@@ -20,6 +21,8 @@
 #include "http_request.h"
 #include "esp_sleep.h"
 #include "1602A.h"
+#include "OTA.h"
+
 
 #define TAG "final-project"
 
@@ -139,6 +142,15 @@ void http_request_task(void *pvParameters)
     }
 }
 
+void update_check_task(void *pvParameters)
+{
+    while (1) {
+        checkForUpdates();
+        vTaskDelay(pdMS_TO_TICKS(3600000)); // Check for updates every hour
+    }
+}
+
+
 void app_main(void)
 {
     // Initialize NVS
@@ -159,6 +171,8 @@ void app_main(void)
 
     // Initialize the Wi-Fi connection
     wifi_init_sta();
+
+    //xTaskCreate(update_check_task, "update_check_task", 8192, NULL, 2, NULL);
 
     // Create the semaphore
     xSemaphore = xSemaphoreCreateBinary();

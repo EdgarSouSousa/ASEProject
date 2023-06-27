@@ -6,7 +6,7 @@
 void send_http_request(int adc_value1, int adc_value2, float temperature, float humidity)
 {
     esp_http_client_config_t config = {
-        .url = "http://192.168.12.222:5000",
+        .url = "http://192.168.1.77:5000",
         .method = HTTP_METHOD_POST,
     };
     esp_http_client_handle_t client = esp_http_client_init(&config);

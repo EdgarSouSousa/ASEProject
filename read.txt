@@ -1,11 +1,60 @@
-To run simply do 
+To run it is needed to change the values in the esp-32 since the SSID Password and ip are hard coded.
 
+idf.py build
+idf.py  -p flash /dev/ttyUSB0
 python3 -m http.server 8000
 python3 webServer.py
 
 double check if the esp and host laptop are in the same network
 check esp SSID and password for acess to the network
+the dashboard will be hosted in localhost:8000
 
 
+Commands for importing and allowing serial port
 sudo chmod 0777 /dev/ttyUSB0
 . $HOME/esp/esp-idf/export.sh
+
+
+
+Below is the file tree of the project
+.
+ |-CMakeLists.txt
+ |-main //main project files
+ | |-http_request.h
+ | |-adc.h
+ | |-adc.c
+ | |-wifi_init.h
+ | |-http_request.c
+ | |-dht11.c
+ | |-dht11.h
+ | |-wifi_init.c
+ | |-main.c
+ | |-1602A.h
+ | |-CMakeLists.txt
+ | |-1602A.c
+ |-README.md
+ |-.git
+ |-build
+ |-sdkconfig
+ |-__pycache__
+ | |-webServer.cpython-39.pyc
+ |-main.js
+ |-.vscode
+ | |-settings.json
+ |-data.json
+ |-lib
+ | |-esp_ghota
+ | | |-.github
+ | | | |-workflows
+ | | |-docs
+ | | | |-api
+ | | | |-build
+ | | |-examples
+ | | | |-esp_ghota_example
+ | | | | |-main
+ | | | | |-spiffs
+ | | |-include
+ | | |-src
+ |-webServer.py  //webserver for receiving http packets
+ |-index.html    //dashboard html + css
+ |-read.txt
