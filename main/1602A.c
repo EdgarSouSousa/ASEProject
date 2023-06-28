@@ -47,38 +47,42 @@ esp_err_t _1602A_send_command(i2c_port_t i2c_port, uint8_t command) {
     vTaskDelay(1 / portTICK_PERIOD_MS); // Add this delay
     
     i2c_master_stop(cmd);
-    err = i2c_master_cmd_begin(i2c_port, cmd, 1000 / portTICK_PERIOD_MS);
+    err = i2c_master_cmd_begin(I2C_PORT, cmd, 1000 / portTICK_PERIOD_MS);
     i2c_cmd_link_delete(cmd);
     
     return err;
 }
 
-esp_err_t _1602A_send_data(i2c_port_t i2c_port, uint8_t command) {
+esp_err_t _1602A_send_data(i2c_port_t i2c_port, uint8_t data) {
     esp_err_t err;
     
-    uint8_t high_nibble = command & 0xF0;
-    uint8_t low_nibble = command << 4;
-    
-    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
-    i2c_master_start(cmd);
-    i2c_master_write_byte(cmd, (DISPLAY_ADDR << 1) | I2C_MASTER_WRITE, true);
-    vTaskDelay(1 / portTICK_PERIOD_MS); // Add this delay
-    i2c_master_write_byte(cmd, high_nibble | 0x09, true);
-    vTaskDelay(1 / portTICK_PERIOD_MS); // Add this delay
-    i2c_master_write_byte(cmd, high_nibble | 0x0D, true); // Send enable pulse (EN=1)
-    vTaskDelay(1 / portTICK_PERIOD_MS); // Add this delay
+    uint8_t high_nibble = data & 0xF0; // Get the high nibble
+    uint8_t low_nibble = (data & 0x0F) << 4; // Get the low nibble and shift it to the left by 4 bits
 
-    
-    
-    i2c_master_write_byte(cmd, low_nibble | 0x09,true);
-    vTaskDelay(1 / portTICK_PERIOD_MS); // Add this delay
-    i2c_master_write_byte(cmd, low_nibble | 0x0D, true); // Send enable pulse (EN=1)
-    vTaskDelay(1 / portTICK_PERIOD_MS); // Add this delay
-    
+    //declare data array to send
+    uint8_t data_array[4];
+
+    data_array[0] = high_nibble | 0x0D;
+    data_array[1] = high_nibble | 0x09;
+    data_array[2] = low_nibble | 0x0D;
+    data_array[3] = low_nibble | 0x09;
+
+    //create command link
+    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
+    //start command
+    i2c_master_start(cmd);
+    //send address
+    i2c_master_write_byte(cmd, (DISPLAY_ADDR << 1) | I2C_MASTER_WRITE, true);
+    //send data
+    i2c_master_write(cmd, data_array, 4, true);
+    //stop command
     i2c_master_stop(cmd);
-    err = i2c_master_cmd_begin(i2c_port, cmd, 1000 / portTICK_PERIOD_MS);
+    //execute command
+    err = i2c_master_cmd_begin(I2C_PORT, cmd, 1000 / portTICK_PERIOD_MS);
+    //delete command link
     i2c_cmd_link_delete(cmd);
-    
+
+
     return err;
 }
 
