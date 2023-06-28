@@ -1,103 +1,109 @@
 #include "esp_http_client.h"
-#include "esp_https_ota.h"
+#include "esp_ota_ops.h"
 #include "esp_log.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_netif.h"
 #include "esp_event.h"
-#include "esp_ota_ops.h"
+#include "esp_app_desc.h"
 #include "OTA.h"
+
+#define BUFFSIZE 1024
+uint8_t ota_write_data[BUFFSIZE + 1] = { 0 };
+
 
 static const char *TAG = "OTA";
 
-static bool isUpdateAvailable(esp_http_client_handle_t client, esp_http_client_config_t *config)
+#ifndef ESP_APP_DESC_SHA256_LEN
+#define ESP_APP_DESC_SHA256_LEN 32
+#endif
+
+
+void uint8_to_char(char *dest, uint8_t *src, size_t src_len)
 {
-    int content_length = esp_http_client_fetch_headers(client);
-    if (content_length > 0)
+    for (size_t i = 0; i < src_len; i++)
     {
-        esp_https_ota_handle_t ota_handle = NULL;
-        esp_https_ota_config_t ota_config = {
-            .http_config = config,
-        };
-
-        esp_err_t err = esp_https_ota_begin(&ota_config, &ota_handle);
-        if (err == ESP_OK)
-        {
-            esp_app_desc_t new_app_info;
-            esp_https_ota_get_img_desc(ota_handle, &new_app_info);
-
-            // Compare current version with the new version
-            esp_app_desc_t running_app_info;
-            esp_ota_get_partition_description(esp_ota_get_running_partition(), &running_app_info);
-
-            esp_https_ota_finish(ota_handle);
-
-            if (strcmp(new_app_info.version, running_app_info.version) != 0)
-            {
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
-static void performOTAUpdate(esp_http_client_handle_t client, esp_http_client_config_t *config)
-{
-    esp_https_ota_handle_t ota_handle = NULL;
-    esp_https_ota_config_t ota_config = {
-        .http_config = config,
-    };
-
-    esp_err_t err = esp_https_ota_begin(&ota_config, &ota_handle);
-    if (err == ESP_OK)
-    {
-        ESP_LOGI(TAG, "Updating firmware...");
-
-        while (1)
-        {
-            err = esp_https_ota_perform(ota_handle);
-            if (err != ESP_ERR_HTTPS_OTA_IN_PROGRESS)
-            {
-                break;
-            }
-        }
-    }
-
-    if (isUpdateAvailable(client, config))
-    {
-        performOTAUpdate(client, config);
-    }
-    else
-    {
-        ESP_LOGI(TAG, "No new firmware available");
+        sprintf(dest + (i * 2), "%02x", src[i]);
     }
 }
 
 void checkForUpdates(void)
 {
     // URL of the firmware binary hosted on your HTTP server
-    const char *firmwareUrl = "https://github.com/EdgarSouSousa/ASEProject/blob/main/build/final-project.bin";
+    const char *firmwareUrl = "http://192.168.1.77:6000/final-project.bin";
 
     esp_http_client_config_t config = {
         .url = firmwareUrl,
         .event_handler = NULL,
-        .timeout_ms = 5000,
+        .timeout_ms = 50000,
     };
+
+    esp_ota_handle_t update_handle = 0;
+    const esp_partition_t *update_partition = NULL;
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
     esp_err_t err = esp_http_client_open(client, 0);
 
     if (err == ESP_OK)
     {
-        if (isUpdateAvailable(client, &config))
+        ESP_LOGI(TAG, "Connection established...");
+        int content_length = esp_http_client_fetch_headers(client);
+        ESP_LOGI(TAG, "Content length: %d bytes", content_length);
+
+       
+        if (content_length > 0)
         {
-            performOTAUpdate(client, &config);
-        }
-        else
-        {
-            ESP_LOGI(TAG, "No new firmware available");
+
+            update_partition = esp_ota_get_next_update_partition(NULL);
+            err = esp_ota_begin(update_partition, OTA_SIZE_UNKNOWN, &update_handle);
+            if (err != ESP_OK)
+            {
+                ESP_LOGE(TAG, "esp_ota_begin failed, error=%d", err);
+                return;
+            }
+            ESP_LOGI(TAG, "esp_ota_begin succeeded");
+
+            // Perform OTA Update
+            while (1)
+            {
+                int data_read = esp_http_client_read(client, (char *)ota_write_data, BUFFSIZE);
+                if (data_read < 0)
+                {
+                    ESP_LOGE(TAG, "Error: SSL data read error");
+                    return;
+                }
+                else if (data_read > 0)
+                {
+                    err = esp_ota_write( update_handle, (const void *)ota_write_data, data_read);
+                    if (err != ESP_OK)
+                    {
+                        return;
+                    }
+                }
+                else if (data_read == 0)
+                {
+                    ESP_LOGI(TAG, "Connection closed, all data received no update found");
+                    break;
+                }
+            }
+
+            err = esp_ota_end(update_handle);
+            if (err != ESP_OK) 
+            {
+                ESP_LOGE(TAG, "esp_ota_end failed!");
+                return;
+            }
+
+            err = esp_ota_set_boot_partition(update_partition);
+            if (err != ESP_OK) 
+            {
+                ESP_LOGE(TAG, "esp_ota_set_boot_partition failed!");
+                return;
+            }
+
+            ESP_LOGI(TAG, "Prepare to restart system!");
+            esp_restart();
         }
     }
     else

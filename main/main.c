@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "esp_http_client.h"
+#include "esp_app_desc.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "soc/soc_caps.h"
@@ -33,6 +34,7 @@
 #define DISPLAY_ADDR 0x27
 
 SemaphoreHandle_t xSemaphore;
+SemaphoreHandle_t xSemaphoreUpdate;
 float temperature, humidity;
 
 void dht11_task(void *pvParameters)
@@ -40,6 +42,7 @@ void dht11_task(void *pvParameters)
     
 
     while (1) {
+        xSemaphoreTake(xSemaphoreUpdate, portMAX_DELAY); // Take the semaphore
         // Read the DHT11 data returned by the sensor
         uint8_t* dht11_data = dht11_read();
         
@@ -53,6 +56,7 @@ void dht11_task(void *pvParameters)
         }
 
         xSemaphoreGive(xSemaphore); // Release the semaphore
+        xSemaphoreGive(xSemaphoreUpdate); // Give the semaphore
         vTaskDelay(pdMS_TO_TICKS(10000)); // Wait for 5 seconds before reading again
     }
 }
@@ -80,6 +84,7 @@ void adc_task(void *pvParameters)
 
     while (1) {
         // Read the ADC values
+        xSemaphoreTake(xSemaphoreUpdate, portMAX_DELAY); // Take the semaphore
         ESP_ERROR_CHECK(adc_oneshot_read(adc1_handle, EXAMPLE_ADC1_CHAN0, &adc_raw[0][0]));
         ESP_LOGI(TAG, "ADC%d Channel[%d] Raw Data: %d", ADC_UNIT_1 + 1, EXAMPLE_ADC1_CHAN0, adc_raw[0][0]);
         if (do_calibration1) {
@@ -94,6 +99,7 @@ void adc_task(void *pvParameters)
             ESP_LOGI(TAG, "ADC%d Channel[%d] Cali Voltage: %d mV", ADC_UNIT_1 + 1, EXAMPLE_ADC1_CHAN1, voltage[0][1]);
         }
 
+        xSemaphoreGive(xSemaphoreUpdate); // Give the semaphore
         xSemaphoreGive(xSemaphore); // Release the semaphore
         vTaskDelay(pdMS_TO_TICKS(10000)); // Wait for 1 second before reading again
     }
@@ -103,7 +109,7 @@ void adc_task(void *pvParameters)
 void http_request_task(void *pvParameters)
 {
     while (1) {
-
+        xSemaphoreTake(xSemaphoreUpdate, portMAX_DELAY); // Take the semaphore
          //normalise the voltage
         voltage[0][0] = (voltage[0][0]- 142) * 100 / 4095;
         voltage[0][1] = (voltage[0][1]-142) * 100 / 4095;
@@ -132,11 +138,11 @@ void http_request_task(void *pvParameters)
         send_http_request(voltage[0][0], voltage[0][1], temperature, humidity);
 
       
-
+        xSemaphoreGive(xSemaphoreUpdate); // Give the semaphore
         // Give the semaphore back to allow the tasks to continue
         xSemaphoreGive(xSemaphore);
 
-        esp_sleep_enable_timer_wakeup(9000000);
+        //esp_sleep_enable_timer_wakeup(9000000);
 
         vTaskDelay(pdMS_TO_TICKS(10000)); // Wait for 10 seconds before sending again
     }
@@ -145,14 +151,18 @@ void http_request_task(void *pvParameters)
 void update_check_task(void *pvParameters)
 {
     while (1) {
+        xSemaphoreTake(xSemaphoreUpdate, portMAX_DELAY); // Take the semaphore
+        ESP_LOGI(TAG, "Checking for updates...");
         checkForUpdates();
-        vTaskDelay(pdMS_TO_TICKS(10000)); // Check for updates every hour
+        xSemaphoreGive(xSemaphoreUpdate); // Give the semaphore
+        vTaskDelay(pdMS_TO_TICKS(16000)); // Check for updates every hour
     }
 }
 
 
 void app_main(void)
 {
+    
     // Initialize NVS
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -172,10 +182,17 @@ void app_main(void)
     // Initialize the Wi-Fi connection
     wifi_init_sta();
 
-    xTaskCreate(update_check_task, "update_check_task", 8192, NULL, 2, NULL);
 
     // Create the semaphore
     xSemaphore = xSemaphoreCreateBinary();
+    xSemaphoreUpdate = xSemaphoreCreateBinary();
+
+    //xSemaphoreGive(xSemaphore); // Give the semaphore
+    xSemaphoreGive(xSemaphoreUpdate); // Give the semaphore
+    
+
+    xTaskCreate(update_check_task, "update_check_task", 8192, NULL, 2, NULL);
+
 
     // Create the DHT11 task
     xTaskCreate(dht11_task, "dht11_task", 2048, NULL, 5, NULL);
