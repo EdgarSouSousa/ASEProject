@@ -57,7 +57,7 @@ void dht11_task(void *pvParameters)
 
         xSemaphoreGive(xSemaphore); // Release the semaphore
         xSemaphoreGive(xSemaphoreUpdate); // Give the semaphore
-        vTaskDelay(pdMS_TO_TICKS(10000)); // Wait for 5 seconds before reading again
+        vTaskDelay(pdMS_TO_TICKS(3000)); // Wait for 5 seconds before reading again
     }
 }
 
@@ -101,7 +101,7 @@ void adc_task(void *pvParameters)
 
         xSemaphoreGive(xSemaphoreUpdate); // Give the semaphore
         xSemaphoreGive(xSemaphore); // Release the semaphore
-        vTaskDelay(pdMS_TO_TICKS(10000)); // Wait for 1 second before reading again
+        vTaskDelay(pdMS_TO_TICKS(3000)); // Wait for 1 second before reading again
     }
 }
 
@@ -144,7 +144,7 @@ void http_request_task(void *pvParameters)
 
         //esp_sleep_enable_timer_wakeup(9000000);
 
-        vTaskDelay(pdMS_TO_TICKS(10000)); // Wait for 10 seconds before sending again
+        vTaskDelay(pdMS_TO_TICKS(3000)); // Wait for 10 seconds before sending again
     }
 }
 
@@ -153,6 +153,13 @@ void update_check_task(void *pvParameters)
     while (1) {
         xSemaphoreTake(xSemaphoreUpdate, portMAX_DELAY); // Take the semaphore
         ESP_LOGI(TAG, "Checking for updates...");
+        //printf("Checking for updates...\n"); on the LCD
+        char updateString[20];
+        sprintf(updateString, "Updating...");
+         _1602A_display_string(updateString);
+
+
+
         checkForUpdates();
         xSemaphoreGive(xSemaphoreUpdate); // Give the semaphore
         vTaskDelay(pdMS_TO_TICKS(16000)); // Check for updates every hour

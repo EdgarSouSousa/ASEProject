@@ -13,4 +13,4 @@ function displayData(data) {
 }
 
 // Fetch data every 3 seconds (3000 milliseconds)
-setInterval(fetchData, 10000);
+setInterval(fetchData, 3000);

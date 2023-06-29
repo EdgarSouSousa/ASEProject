@@ -31,7 +31,7 @@ void uint8_to_char(char *dest, uint8_t *src, size_t src_len)
 void checkForUpdates(void)
 {
     // URL of the firmware binary hosted on your HTTP server
-    const char *firmwareUrl = "http://192.168.1.77:6000/final-project.bin";
+    const char *firmwareUrl = "http://192.168.151.222:6000/final-project.bin";
 
     esp_http_client_config_t config = {
         .url = firmwareUrl,

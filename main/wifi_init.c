@@ -50,8 +50,8 @@ void wifi_init_sta(void)
 
     wifi_config_t wifi_config = {
         .sta = {
-            .ssid = "MEO-4D0E10",
-            .password = "bbd8544aae",
+            .ssid = "Arduino",
+            .password = "edgarsousa",
         },
     };
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
